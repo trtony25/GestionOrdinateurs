@@ -46,9 +46,14 @@ jobs:
       - name: Login Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
+      # Les secrets de l'environnement "dev" ne sont lisibles que dans le job : on les passe à chaque étape
       - name: Build images
+        env:
+          DOCKER_ACCOUNT: ${{ secrets.DOCKER_ACCOUNT }}
         run: docker compose build
 
       # On ne pousse que nos 4 images (postgres et keycloak viennent de registres publics)
       - name: Push images
+        env:
+          DOCKER_ACCOUNT: ${{ secrets.DOCKER_ACCOUNT }}
         run: docker compose push authentification-api gestionordinateurs-api gateway client
