@@ -50,10 +50,14 @@ jobs:
       - name: Build images
         env:
           DOCKER_ACCOUNT: ${{ secrets.DOCKER_ACCOUNT }}
-        run: docker compose build
+        run: |
+          export DOCKER_ACCOUNT=$(echo "$DOCKER_ACCOUNT" | tr -d '[:space:]')
+          docker compose build
 
       # On ne pousse que nos 4 images (postgres et keycloak viennent de registres publics)
       - name: Push images
         env:
           DOCKER_ACCOUNT: ${{ secrets.DOCKER_ACCOUNT }}
-        run: docker compose push authentification-api gestionordinateurs-api gateway client
+        run: |
+          export DOCKER_ACCOUNT=$(echo "$DOCKER_ACCOUNT" | tr -d '[:space:]')
+          docker compose push authentification-api gestionordinateurs-api gateway client
