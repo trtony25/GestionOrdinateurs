@@ -10,6 +10,9 @@ namespace AuthentificationApi.Controllers;
 // Corps de la requête de connexion : seulement le login (pas de mot de passe dans ce TP)
 public record LoginRequest(string Login);
 
+// Corps de la requête de connexion Keycloak : login + mot de passe
+public record KeycloakLoginRequest(string Login, string Password);
+
 [ApiController]
 [Route("api/[controller]")]
 public class AuthenticationController : ControllerBase
@@ -55,5 +58,29 @@ public class AuthenticationController : ControllerBase
             signingCredentials: creds);
 
         return Ok(new JwtSecurityTokenHandler().WriteToken(token));
+    }
+
+    // POST api/authentication/keycloak-login : échange login/mot de passe contre un token Keycloak
+    // (flux "password" OIDC). Le login historique ci-dessus est conservé.
+    [HttpPost("keycloak-login")]
+    public async Task<IActionResult> KeycloakLogin([FromBody] KeycloakLoginRequest request)
+    {
+        var tokenUrl = $"{_configuration["Keycloak:BaseUrl"]}/realms/{_configuration["Keycloak:Realm"]}/protocol/openid-connect/token";
+
+        var client = _httpClientFactory.CreateClient();
+        var response = await client.PostAsync(tokenUrl, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = _configuration["Keycloak:ClientId"]!,
+            ["username"] = request.Login,
+            ["password"] = request.Password
+        }));
+
+        if (!response.IsSuccessStatusCode)
+            return Unauthorized("Identifiants Keycloak invalides");
+
+        // On renvoie uniquement l'access_token, comme le login historique renvoie le JWT
+        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        return Ok(json.GetProperty("access_token").GetString());
     }
 }

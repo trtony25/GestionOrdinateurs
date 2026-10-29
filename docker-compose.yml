@@ -1,0 +1,123 @@
+services:
+
+  # Base PostgreSQL (fournie par le sujet ; l'API utilise actuellement SQLite, voir gestionordinateurs-api)
+  postgres:
+    image: postgres:15
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: GestionOrdinateursDb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - appnet
+
+  # Serveur d'identité OIDC. Le realm "gestion" (client, rôles, utilisateurs) est importé au démarrage.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    container_name: keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      # URL publique vue par le navigateur (issuer des tokens)
+      KC_HOSTNAME: http://localhost:8180
+      # Les appels serveur-à-serveur (backchannel) utilisent l'adresse interne keycloak:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    command: start-dev --import-realm
+    ports:
+      - "8180:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/realm-gestion.json:/opt/keycloak/data/import/realm-gestion.json:ro
+    networks:
+      - appnet
+
+  authentification-api:
+    image: ${DOCKER_ACCOUNT:-local}/authentificationapi:latest
+    build:
+      context: .
+      dockerfile: AuthentificationApi/Dockerfile
+    container_name: authentification_api
+    ports:
+      - "5157:5157"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5157
+      # Appels internes : nom du service docker au lieu de localhost
+      GestionOrdinateursApi__BaseUrl: http://gestionordinateurs-api:5127
+      Keycloak__BaseUrl: http://keycloak:8080
+    depends_on:
+      - gestionordinateurs-api
+      - keycloak
+    networks:
+      - appnet
+
+  gestionordinateurs-api:
+    image: ${DOCKER_ACCOUNT:-local}/gestionordinateurs-api:latest
+    build:
+      context: .
+      dockerfile: GestionOrdinateurs.API/Dockerfile
+    container_name: gestionordinateurs_api
+    ports:
+      - "5127:5127"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5127
+      # Base SQLite persistée dans un volume (créée et alimentée au démarrage par les migrations)
+      ConnectionStrings__Default: Data Source=/data/parcinfo.db
+      # Issuer = URL publique de Keycloak ; métadonnées lues via l'adresse interne
+      Keycloak__Issuer: http://localhost:8180/realms/gestion
+      Keycloak__MetadataAddress: http://keycloak:8080/realms/gestion/.well-known/openid-configuration
+    volumes:
+      - api_data:/data
+    depends_on:
+      - keycloak
+    networks:
+      - appnet
+
+  gateway:
+    image: ${DOCKER_ACCOUNT:-local}/gateway:latest
+    build:
+      context: .
+      dockerfile: GestionOrdinateurs.Gateway/Dockerfile
+    container_name: gateway
+    ports:
+      - "5010:5010"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5010
+      ReverseProxy__Clusters__gestion-api__Destinations__destination1__Address: http://gestionordinateurs-api:5127/
+    depends_on:
+      - gestionordinateurs-api
+    networks:
+      - appnet
+
+  # Front Blazor WebAssembly servi par nginx sur le port 5000
+  client:
+    image: ${DOCKER_ACCOUNT:-local}/client:latest
+    build:
+      context: .
+      dockerfile: GestionOrdinateurs.Client/Dockerfile
+    container_name: client
+    ports:
+      - "5000:5000"
+    depends_on:
+      - gateway
+      - authentification-api
+      - keycloak
+    networks:
+      - appnet
+
+networks:
+  appnet:
+
+volumes:
+  postgres_data:
+  keycloak_data:
+  api_data:

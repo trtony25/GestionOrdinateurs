@@ -1,6 +1,6 @@
-﻿@using System.IdentityModel.Tokens.Jwt
-@using Blazored.SessionStorage
-@inject ISessionStorageService SessionStorage
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Navigation
 
 <div class="top-row ps-3 navbar navbar-dark">
@@ -61,35 +61,32 @@
     protected override async Task OnInitializedAsync()
     {
         await ActualiserUtilisateur();
-        // À chaque navigation (ex : après connexion), on relit le token en session
-        Navigation.LocationChanged += async (_, _) =>
+        // Se met à jour quand l'état d'authentification change (connexion / déconnexion)
+        AuthProvider.AuthenticationStateChanged += async _ =>
         {
             await ActualiserUtilisateur();
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         };
     }
 
-    // Lit le token en session et en extrait le nom et le rôle de l'utilisateur connecté
+    // Lit l'identité fournie par Keycloak : nom d'utilisateur et rôle (claim "role" du realm)
     private async Task ActualiserUtilisateur()
     {
-        var token = await SessionStorage.GetItemAsStringAsync("token");
-        estConnecte = !string.IsNullOrEmpty(token);
+        var user = (await AuthProvider.GetAuthenticationStateAsync()).User;
+        estConnecte = user.Identity?.IsAuthenticated == true;
 
         if (estConnecte)
         {
-            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-            var nom = jwt.Claims.FirstOrDefault(c => c.Type == "unique_name")?.Value;
-            var role = jwt.Claims.FirstOrDefault(c => c.Type == "role")?.Value;
+            var nom = user.FindFirst("preferred_username")?.Value ?? user.Identity?.Name;
+            var role = string.Join(", ", user.FindAll("role").Select(c => c.Value));
             utilisateur = $"{nom} ({role})";
         }
     }
 
-    // Supprime le token de la session et retourne à l'accueil
-    private async Task Deconnecter()
+    // Déconnexion : redirige vers Keycloak pour fermer la session SSO
+    private void Deconnecter()
     {
-        await SessionStorage.RemoveItemAsync("token");
-        estConnecte = false;
-        Navigation.NavigateTo("/");
+        Navigation.NavigateToLogout("authentication/logout");
     }
 
     private void ToggleNavMenu()

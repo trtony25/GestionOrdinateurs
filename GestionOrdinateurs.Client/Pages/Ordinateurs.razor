@@ -1,10 +1,10 @@
 @page "/ordinateurs"
 @using System.Net
 @using System.Net.Http.Headers
-@using Blazored.SessionStorage
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @using GestionOrdinateurs.Shared
 @inject IHttpClientFactory HttpClientFactory
-@inject ISessionStorageService SessionStorage
+@inject IAccessTokenProvider TokenProvider
 
 <PageTitle>Ordinateurs</PageTitle>
 
@@ -49,12 +49,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var token = await SessionStorage.GetItemAsStringAsync("token");
-        if (string.IsNullOrEmpty(token))
+        // Token d'accès Keycloak fourni par la librairie OIDC
+        var tokenResult = await TokenProvider.RequestAccessToken();
+        if (!tokenResult.TryGetToken(out var accessToken))
         {
             erreur = "Veuillez vous connecter.";
             return;
         }
+        var token = accessToken.Value;
 
         // Appel via la Gateway, avec le token JWT dans l'en-tête Authorization
         var client = HttpClientFactory.CreateClient("Gateway");

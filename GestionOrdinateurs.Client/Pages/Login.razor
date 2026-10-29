@@ -1,53 +1,19 @@
 @page "/login"
-@using System.Net
-@using Blazored.SessionStorage
-@inject IHttpClientFactory HttpClientFactory
-@inject ISessionStorageService SessionStorage
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @inject NavigationManager Navigation
 
 <PageTitle>Connexion</PageTitle>
 
 <h1>Connexion</h1>
 
-<div class="mb-3">
-    <label class="form-label">Utilisateur</label>
-    <input class="form-control" @bind="login" placeholder="ex : user1" />
-</div>
+<p>L'authentification est gérée par Keycloak (utilisateur et mot de passe saisis sur sa page de connexion).</p>
 
-<button class="btn btn-primary" @onclick="Connecter">Se connecter</button>
-
-@if (!string.IsNullOrEmpty(message))
-{
-    <p class="text-danger mt-3">@message</p>
-}
+<button class="btn btn-primary" @onclick="Connecter">Se connecter avec Keycloak</button>
 
 @code {
-    private string login = string.Empty;
-    private string message = string.Empty;
-
-    // Demande un token JWT à l'API d'authentification, le sauvegarde en session puis redirige vers l'accueil
-    private async Task Connecter()
+    // Redirige vers la page de connexion Keycloak (OIDC) ; au retour, le token est géré par la librairie
+    private void Connecter()
     {
-        message = string.Empty;
-
-        var client = HttpClientFactory.CreateClient("Auth");
-        var response = await client.PostAsJsonAsync("api/authentication/login", new { login });
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            message = "L'utilisateur n'existe pas";
-            return;
-        }
-
-        if (!response.IsSuccessStatusCode)
-        {
-            message = "Erreur lors de la connexion";
-            return;
-        }
-
-        var token = await response.Content.ReadAsStringAsync();
-        await SessionStorage.SetItemAsStringAsync("token", token);
-
-        Navigation.NavigateTo("/");
+        Navigation.NavigateToLogin("authentication/login");
     }
 }
