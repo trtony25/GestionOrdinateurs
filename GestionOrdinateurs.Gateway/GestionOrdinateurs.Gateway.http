@@ -1,0 +1,8 @@
+@GestionOrdinateurs.Gateway_HostAddress = http://localhost:5010
+@token = collez_ici_le_token_obtenu_via_AuthentificationApi
+
+GET {{GestionOrdinateurs.Gateway_HostAddress}}/api/ordinateurs
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###

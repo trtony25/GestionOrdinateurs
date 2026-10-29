@@ -1,0 +1,74 @@
+@page "/reparations"
+@using System.Net
+@using System.Net.Http.Headers
+@using Blazored.SessionStorage
+@inject IHttpClientFactory HttpClientFactory
+@inject ISessionStorageService SessionStorage
+
+<PageTitle>Réparations</PageTitle>
+
+<h1>Historique des réparations</h1>
+
+@if (!string.IsNullOrEmpty(erreur))
+{
+    <p class="text-danger">@erreur</p>
+}
+else if (reparations is null)
+{
+    <p>Chargement...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Ordinateur</th>
+                <th>Technicien</th>
+                <th>Type de réparation</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in reparations)
+            {
+                <tr>
+                    <td>@r.NomOrdinateur</td>
+                    <td>@r.Technicien</td>
+                    <td>@r.TypeReparation</td>
+                    <td>@r.DateIntervention</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    // Correspond au record renvoyé par GET api/reparations/historique
+    private record HistoriqueReparation(int OrdinateurId, string NomOrdinateur, string Technicien, string TypeReparation, DateTime DateIntervention);
+
+    private List<HistoriqueReparation>? reparations;
+    private string erreur = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await SessionStorage.GetItemAsStringAsync("token");
+        if (string.IsNullOrEmpty(token))
+        {
+            erreur = "Veuillez vous connecter.";
+            return;
+        }
+
+        // Appel via la Gateway, avec le token JWT dans l'en-tête Authorization
+        var client = HttpClientFactory.CreateClient("Gateway");
+        var request = new HttpRequestMessage(HttpMethod.Get, "api/reparations/historique");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.SendAsync(request);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            erreur = "Session expirée ou invalide, veuillez vous reconnecter.";
+        else if (!response.IsSuccessStatusCode)
+            erreur = "Erreur lors du chargement des réparations.";
+        else
+            reparations = await response.Content.ReadFromJsonAsync<List<HistoriqueReparation>>();
+    }
+}

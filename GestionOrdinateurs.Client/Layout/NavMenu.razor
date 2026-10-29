@@ -1,0 +1,99 @@
+﻿@using System.IdentityModel.Tokens.Jwt
+@using Blazored.SessionStorage
+@inject ISessionStorageService SessionStorage
+@inject NavigationManager Navigation
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">GestionOrdinateurs.Client</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="ordinateurs">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Ordinateurs
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="reparations">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Réparations
+            </NavLink>
+        </div>
+        @if (!estConnecte)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="login">
+                    <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Connexion
+                </NavLink>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <span class="nav-link">Connecté : @utilisateur</span>
+            </div>
+            <div class="nav-item px-3">
+                <button class="nav-link btn btn-link" @onclick="Deconnecter">
+                    <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Déconnexion
+                </button>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool estConnecte;
+    private string utilisateur = string.Empty;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ActualiserUtilisateur();
+        // À chaque navigation (ex : après connexion), on relit le token en session
+        Navigation.LocationChanged += async (_, _) =>
+        {
+            await ActualiserUtilisateur();
+            StateHasChanged();
+        };
+    }
+
+    // Lit le token en session et en extrait le nom et le rôle de l'utilisateur connecté
+    private async Task ActualiserUtilisateur()
+    {
+        var token = await SessionStorage.GetItemAsStringAsync("token");
+        estConnecte = !string.IsNullOrEmpty(token);
+
+        if (estConnecte)
+        {
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            var nom = jwt.Claims.FirstOrDefault(c => c.Type == "unique_name")?.Value;
+            var role = jwt.Claims.FirstOrDefault(c => c.Type == "role")?.Value;
+            utilisateur = $"{nom} ({role})";
+        }
+    }
+
+    // Supprime le token de la session et retourne à l'accueil
+    private async Task Deconnecter()
+    {
+        await SessionStorage.RemoveItemAsync("token");
+        estConnecte = false;
+        Navigation.NavigateTo("/");
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

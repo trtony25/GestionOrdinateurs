@@ -1,0 +1,6 @@
+@GestionOrdinateurs.API_HostAddress = http://localhost:5172
+
+GET {{GestionOrdinateurs.API_HostAddress}}/api/users
+Accept: application/json
+
+###

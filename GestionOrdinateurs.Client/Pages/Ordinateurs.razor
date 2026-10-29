@@ -1,0 +1,72 @@
+@page "/ordinateurs"
+@using System.Net
+@using System.Net.Http.Headers
+@using Blazored.SessionStorage
+@using GestionOrdinateurs.Shared
+@inject IHttpClientFactory HttpClientFactory
+@inject ISessionStorageService SessionStorage
+
+<PageTitle>Ordinateurs</PageTitle>
+
+<h1>Liste des ordinateurs</h1>
+
+@if (!string.IsNullOrEmpty(erreur))
+{
+    <p class="text-danger">@erreur</p>
+}
+else if (ordinateurs is null)
+{
+    <p>Chargement...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Prix</th>
+                <th>Devise</th>
+                <th>Vendu</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in ordinateurs)
+            {
+                <tr>
+                    <td>@o.Nom</td>
+                    <td>@o.Prix</td>
+                    <td>EUR</td>
+                    <td>@(o.Vendu ? "Oui" : "Non")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Ordinateur>? ordinateurs;
+    private string erreur = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await SessionStorage.GetItemAsStringAsync("token");
+        if (string.IsNullOrEmpty(token))
+        {
+            erreur = "Veuillez vous connecter.";
+            return;
+        }
+
+        // Appel via la Gateway, avec le token JWT dans l'en-tête Authorization
+        var client = HttpClientFactory.CreateClient("Gateway");
+        var request = new HttpRequestMessage(HttpMethod.Get, "api/ordinateurs");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.SendAsync(request);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            erreur = "Session expirée ou invalide, veuillez vous reconnecter.";
+        else if (!response.IsSuccessStatusCode)
+            erreur = "Erreur lors du chargement des ordinateurs.";
+        else
+            ordinateurs = await response.Content.ReadFromJsonAsync<List<Ordinateur>>();
+    }
+}
