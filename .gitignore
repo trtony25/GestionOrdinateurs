@@ -431,5 +431,6 @@ FodyWeavers.xsd
 .env
 !.env.example
 *.db
+!GestionOrdinateurs.API/parcinfo.db
 *.db-shm
 *.db-wal

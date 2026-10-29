@@ -69,13 +69,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5127
-      # Base SQLite persistée dans un volume (créée et alimentée au démarrage par les migrations)
-      ConnectionStrings__Default: Data Source=/data/parcinfo.db
       # Issuer = URL publique de Keycloak ; métadonnées lues via l'adresse interne
       Keycloak__Issuer: http://localhost:8180/realms/gestion
       Keycloak__MetadataAddress: http://keycloak:8080/realms/gestion/.well-known/openid-configuration
-    volumes:
-      - api_data:/data
     depends_on:
       - keycloak
     networks:
@@ -120,4 +116,3 @@ networks:
 volumes:
   postgres_data:
   keycloak_data:
-  api_data:
